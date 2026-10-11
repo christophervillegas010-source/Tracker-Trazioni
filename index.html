@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#166534">
+  <meta name="description" content="Diario personale del peso, con grafico e salvataggio sul dispositivo.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <title>WeightTrack</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f7f4; --card:#fff; --text:#17231b; --muted:#66736a; --green:#15803d; --line:#dfe7e0; --danger:#b42318; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#101713; --card:#18221b; --text:#edf5ef; --muted:#a6b5aa; --green:#4ade80; --line:#2a392e; --danger:#ff8a80; }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    main { width:min(720px,100%); margin:0 auto; padding: max(18px,env(safe-area-inset-top)) 16px 28px; }
+    header { display:flex; align-items:center; gap:12px; margin:8px 0 22px; }
+    .logo { display:grid; place-items:center; width:46px; height:46px; border-radius:15px; color:white; background:#166534; font-size:25px; }
+    h1 { font-size:1.55rem; margin:0; letter-spacing:-.03em; }
+    .subtitle { color:var(--muted); font-size:.9rem; margin-top:2px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:18px; margin:14px 0; box-shadow:0 3px 14px #00000008; }
+    .stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .stat-label { color:var(--muted); font-size:.83rem; }
+    .stat-value { font-size:1.75rem; font-weight:750; letter-spacing:-.04em; margin-top:5px; }
+    h2 { font-size:1.05rem; margin:0 0 15px; }
+    label { display:block; font-size:.88rem; font-weight:650; margin-bottom:7px; }
+    input { width:100%; padding:13px 12px; border:1px solid var(--line); border-radius:12px; background:var(--bg); color:var(--text); font:inherit; font-size:1rem; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    button { border:0; border-radius:12px; padding:13px 15px; font:inherit; font-weight:700; cursor:pointer; }
+    .primary { background:#166534; color:white; width:100%; margin-top:14px; }
+    .secondary { background:var(--line); color:var(--text); }
+    .danger { background:transparent; color:var(--danger); padding:7px 9px; font-size:.84rem; }
+    .chart-wrap { width:100%; overflow:hidden; }
+    svg#chart { display:block; width:100%; height:auto; min-height:190px; }
+    .empty { color:var(--muted); text-align:center; padding:20px 6px; }
+    .history-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); }
+    .history-item:last-child { border-bottom:0; }
+    .entry-date { font-size:.9rem; color:var(--muted); }
+    .entry-weight { font-size:1.05rem; font-weight:750; margin-top:3px; }
+    .history-actions { display:flex; align-items:center; gap:4px; }
+    .small-note { font-size:.8rem; color:var(--muted); line-height:1.5; }
+    .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    .toolbar button { flex:1; }
+    .toast { display:none; margin-top:12px; padding:10px 12px; background:var(--line); border-radius:10px; font-size:.9rem; }
+    footer { text-align:center; color:var(--muted); font-size:.78rem; padding:10px 8px 0; }
+    @media (max-width:380px) { .card { padding:14px; } .stat-value { font-size:1.45rem; } .form-grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo" aria-hidden="true">↗</div>
+    <div><h1>Pull-Up Diary</h1><div class="subtitle">Il diario per le trazioni zavorrate</div></div>
+  </header>
+
+  <section class="stats">
+    <div class="card">
+      <div class="stat-label">Ultimo peso</div>
+      <div class="stat-value" id="latestWeight">—</div>
+    </div>
+    <div class="card">
+      <div class="stat-label">Variazione totale</div>
+      <div class="stat-value" id="changeWeight">—</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Andamento del peso</h2>
+    <div class="chart-wrap"><svg id="chart" viewBox="0 0 340 205" role="img" aria-label="Grafico del peso nel tempo"></svg></div>
+    <div class="toolbar">
+      <button class="secondary" data-range="7">7 giorni</button>
+      <button class="secondary" data-range="30">30 giorni</button>
+      <button class="secondary" data-range="all">Tutto</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 id="formTitle">Registra una misurazione</h2>
+    <form id="weightForm">
+      <div class="form-grid">
+        <div>
+          <label for="weight">Peso (kg)</label>
+          <input id="weight" name="weight" type="number" inputmode="decimal" min="1" max="500" step="0.1" placeholder="Es. 63,2" required>
+        </div>
+        <div>
+          <label for="date">Data</label>
+          <input id="date" name="date" type="date" required>
+        </div>
+      </div>
+      <button class="primary" id="saveButton" type="submit">Salva peso</button>
+      <button class="secondary" id="cancelEdit" type="button" style="display:none;width:100%;margin-top:8px">Annulla modifica</button>
+      <div class="toast" id="toast" role="status"></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Storico misurazioni</h2>
+    <div id="history"></div>
+    <div class="toolbar">
+      <button class="secondary" id="exportBtn" type="button">Esporta backup CSV</button>
+      <button class="secondary" id="importBtn" type="button">Importa CSV</button>
+      <input id="importFile" type="file" accept=".csv,text/csv" hidden>
+    </div>
+    <p class="small-note">I dati sono salvati nel browser di questo dispositivo. Usa “Esporta backup CSV” periodicamente per conservarne una copia.</p>
+  </section>
+
+  <footer>WeightTrack · Dati personali salvati localmente</footer>
+</main>
+
+<script>
+(() => {
+  const STORAGE_KEY = "weighttrack.measurements.v1";
+  const $ = (id) => document.getElementById(id);
+  let measurements = loadData();
+  let selectedRange = "30";
+  let editingId = null;
+
+  function localDateString(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  function loadData() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(x => x && typeof x.date === "string" && Number.isFinite(Number(x.weight)))
+        .map(x => ({ id: String(x.id || `${x.date}-${x.weight}`), date: x.date, weight: Number(x.weight) }));
+    } catch { return []; }
+  }
+  function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(measurements)); }
+  function sortedData() { return [...measurements].sort((a,b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)); }
+  function formatWeight(value) { return `${Number(value).toLocaleString("it-IT", {minimumFractionDigits:1, maximumFractionDigits:1})} kg`; }
+  function formatDate(value) {
+    const [y,m,d] = value.split("-").map(Number);
+    return new Date(y, m-1, d).toLocaleDateString("it-IT", {day:"numeric", month:"short", year:"numeric"});
+  }
+  function showToast(message) {
+    $("toast").textContent = message;
+    $("toast").style.display = "block";
+    setTimeout(() => $("toast").style.display = "none", 2600);
+  }
+  function renderStats(data) {
+    const latest = data[data.length - 1];
+    $("latestWeight").textContent = latest ? formatWeight(latest.weight) : "—";
+    if (data.length >= 2) {
+      const delta = data[data.length - 1].weight - data[0].weight;
+      $("changeWeight").textContent = `${delta > 0 ? "+" : ""}${delta.toLocaleString("it-IT", {minimumFractionDigits:1, maximumFractionDigits:1})} kg`;
+    } else $("changeWeight").textContent = "—";
+  }
+  function renderChart(data) {
+    const svg = $("chart");
+    const ns = "http://www.w3.org/2000/svg";
+    svg.replaceChildren();
+    const create = (tag, attrs, text) => {
+      const el = document.createElementNS(ns, tag);
+      Object.entries(attrs || {}).forEach(([k,v]) => el.setAttribute(k, v));
+      if (text !== undefined) el.textContent = text;
+      svg.appendChild(el);
+      return el;
+    };
+    const now = new Date(); now.setHours(0,0,0,0);
+    let shown = data;
+    if (selectedRange !== "all") {
+      const cutoff = new Date(now);
+      cutoff.setDate(cutoff.getDate() - Number(selectedRange) + 1);
+      const cutoffStr = localDateString(cutoff);
+      shown = data.filter(x => x.date >= cutoffStr && x.date <= localDateString(now));
+    }
+    const W=340, H=205, left=42, right=12, top=15, bottom=35;
+    const plotW=W-left-right, plotH=H-top-bottom;
+    if (!shown.length) {
+      create("text",{x:W/2,y:90,"text-anchor":"middle","font-size":"12",fill:"currentColor"},"Nessun dato nel periodo");
+      create("text",{x:W/2,y:110,"text-anchor":"middle","font-size":"10",fill:"currentColor",opacity:".65"},"Registra una misurazione per iniziare");
+      return;
+    }
+    const weights = shown.map(x => x.weight);
+    let min = Math.min(...weights), max = Math.max(...weights);
+    if (min === max) { min -= 1; max += 1; }
+    const pad = (max-min)*0.15; min -= pad; max += pad;
+    const xs = shown.map((x,i) => shown.length === 1 ? left+plotW/2 : left+i*plotW/(shown.length-1));
+    const ys = shown.map(x => top+(max-x.weight)/(max-min)*plotH);
+    for (let i=0;i<4;i++) {
+      const y=top+i*plotH/3;
+      create("line",{x1:left,y1:y,x2:W-right,y2:y,stroke:"currentColor","stroke-opacity":".14"});
+      const value=max-i*(max-min)/3;
+      create("text",{x:left-7,y:y+4,"text-anchor":"end","font-size":"10",fill:"currentColor"},value.toLocaleString("it-IT",{maximumFractionDigits:1}));
+    }
+    if (shown.length > 1) {
+      const path = xs.map((x,i) => `${i===0?"M":"L"} ${x} ${ys[i]}`).join(" ");
+      create("path",{d:path,fill:"none",stroke:"#16a34a","stroke-width":"2.7","stroke-linecap":"round","stroke-linejoin":"round"});
+    }
+    xs.forEach((x,i) => create("circle",{cx:x,cy:ys[i],r:3.5,fill:"#16a34a",stroke:"var(--card)","stroke-width":"1.5"}));
+    const labels = [shown[0], shown[Math.floor((shown.length-1)/2)], shown[shown.length-1]];
+    const positions = [left, left+plotW/2, W-right];
+    labels.forEach((item,i) => {
+      if (i>0 && item.date===labels[i-1].date) return;
+      create("text",{x:positions[i],y:H-12,"text-anchor":i===0?"start":i===2?"end":"middle","font-size":"9",fill:"currentColor"},item.date.slice(5).replace("-","/"));
+    });
+  }
+  function renderHistory(data) {
+    const history = $("history");
+    history.replaceChildren();
+    if (!data.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Ancora nessuna misurazione. Inserisci il tuo primo peso qui sopra.";
+      history.appendChild(empty);
+      return;
+    }
+    [...data].reverse().forEach(item => {
+      const row = document.createElement("div"); row.className = "history-item";
+      const info = document.createElement("div");
+      const date = document.createElement("div"); date.className = "entry-date"; date.textContent = formatDate(item.date);
+      const weight = document.createElement("div"); weight.className = "entry-weight"; weight.textContent = formatWeight(item.weight);
+      info.append(date, weight);
+      const actions = document.createElement("div"); actions.className = "history-actions";
+      const edit = document.createElement("button"); edit.className = "secondary"; edit.type = "button"; edit.textContent = "Modifica";
+      edit.setAttribute("aria-label", `Modifica misurazione del ${formatDate(item.date)}`);
+      edit.addEventListener("click", () => startEdit(item));
+      const del = document.createElement("button"); del.className = "danger"; del.type = "button"; del.textContent = "Elimina";
+      del.setAttribute("aria-label", `Elimina misurazione del ${formatDate(item.date)}`);
+      del.addEventListener("click", () => {
+        if (confirm(`Eliminare la misurazione del ${formatDate(item.date)}?`)) {
+          measurements = measurements.filter(x => x.id !== item.id); persist(); render(); showToast("Misurazione eliminata.");
+        }
+      });
+      actions.append(edit,del); row.append(info,actions); history.appendChild(row);
+    });
+  }
+  function render() {
+    const data = sortedData();
+    renderStats(data); renderChart(data); renderHistory(data);
+  }
+  function resetForm() {
+    editingId = null; $("weightForm").reset(); $("date").value = localDateString();
+    $("formTitle").textContent = "Registra una misurazione"; $("saveButton").textContent = "Salva peso";
+    $("cancelEdit").style.display = "none";
+  }
+  function startEdit(item) {
+    editingId = item.id; $("weight").value = item.weight; $("date").value = item.date;
+    $("formTitle").textContent = "Modifica misurazione"; $("saveButton").textContent = "Salva modifiche";
+    $("cancelEdit").style.display = "block";
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+  $("weightForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const weight = Number($("weight").value), date = $("date").value;
+    if (!Number.isFinite(weight) || weight <= 0 || weight > 500 || !date) { showToast("Inserisci un peso e una data validi."); return; }
+    const existing = measurements.find(x => x.date === date && x.id !== editingId);
+    if (existing && !confirm("Esiste già una misurazione per questa data. Vuoi sostituirla?")) return;
+    if (existing) measurements = measurements.filter(x => x.id !== existing.id);
+    if (editingId) {
+      measurements = measurements.map(x => x.id === editingId ? {...x, date, weight} : x);
+    } else {
+      measurements.push({id: (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`), date, weight});
+    }
+    persist(); resetForm(); render(); showToast("Peso salvato sul dispositivo.");
+  });
+  $("cancelEdit").addEventListener("click", resetForm);
+  document.querySelectorAll("[data-range]").forEach(button => button.addEventListener("click", () => {
+    selectedRange = button.dataset.range; renderChart(sortedData());
+  }));
+  $("exportBtn").addEventListener("click", () => {
+    const rows = [["date","weight_kg"], ...sortedData().map(x => [x.date, String(x.weight)])];
+    const csv = rows.map(row => row.join(",")).join("\r\n");
+    const blob = new Blob(["\ufeff"+csv], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = `weighttrack-backup-${localDateString()}.csv`; a.click(); URL.revokeObjectURL(url);
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.replace(/^\uFEFF/,"").trim().split(/\r?\n/);
+      const imported = [];
+      for (const line of lines.slice(1)) {
+        const [date, weightRaw] = line.split(",");
+        const weight = Number(weightRaw);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(weight) && weight > 0 && weight <= 500) {
+          imported.push({id:`${date}-${weight}-${Math.random()}`,date,weight});
+        }
+      }
+      if (!imported.length) throw new Error("Il file non contiene misurazioni valide.");
+      if (!confirm(`Importare ${imported.length} misurazioni? Le date già presenti saranno sostituite.`)) return;
+      for (const item of imported) measurements = measurements.filter(x => x.date !== item.date);
+      measurements.push(...imported); persist(); render(); showToast("Backup importato.");
+    } catch (err) { alert(err.message || "Impossibile importare il file."); }
+    finally { e.target.value = ""; }
+  });
+
+  $("date").value = localDateString();
+  render();
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>

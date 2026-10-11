@@ -1,0 +1,15 @@
+{
+  "name": "WeightTrack - Diario del peso",
+  "short_name": "WeightTrack",
+  "description": "Diario personale del peso con grafico e salvataggio locale",
+  "lang": "it-IT",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f4",
+  "theme_color": "#166534",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
